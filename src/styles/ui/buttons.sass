@@ -1,0 +1,16 @@
+@use "/src/styles/base/_variables.sass" as *
+
+@mixin general
+    font-family: inherit
+    color: $beige
+    border: none
+    height: 40px
+    width: 100%
+
+.black_btn
+    @include general
+    background-color: $blackish
+
+.gold_btn
+    @include general
+    background-color: $gold
