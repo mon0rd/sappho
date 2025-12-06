@@ -6,8 +6,18 @@
     border: none
     height: 40px
     width: 100%
+    cursor: pointer
 
 .black_btn
+    @include general
+    background-color: $black
+    font-size: 18px
+    height: 35px
+    transition: all 0.4s ease
+    &:hover
+        opacity: .6
+
+.blackish_btn
     @include general
     background-color: $blackish
 

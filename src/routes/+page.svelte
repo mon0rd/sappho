@@ -1,7 +1,7 @@
 <script>
 </script>
 
-<div class="wrapper">
+<div>
 	<div>
 		1Lorem, ipsum dolor sit amet consectetur adipisicing elit. Facilis iure beatae saepe ipsum,
 		adipisci assumenda nostrum ad iste laborum labore dolore! Nihil non unde iusto repellat id, sed
