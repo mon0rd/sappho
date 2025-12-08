@@ -20,6 +20,7 @@
 
 <style lang="sass">
 @use '../../styles/base/_variables.sass' as *;
+
 footer
     display: flex
     flex-direction: column
