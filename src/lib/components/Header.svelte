@@ -5,7 +5,7 @@
 		{ href: '/candles', text: 'Candles' },
 		{ href: '/ceramics', text: 'Ceramics' },
 		{ href: '/merch', text: 'Merch' },
-		{ href: '/gift-card', text: 'Gift Card' }
+		{ href: '/gift', text: 'Gift Card' }
 	];
 
 	// MorphingHeader by scroll

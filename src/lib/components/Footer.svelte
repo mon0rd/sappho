@@ -12,7 +12,7 @@
 		class="insta_link"
 		target="_blank"
 		rel="noopener noreferrer">
-		<img src="/src/lib/assets/instagram.png" alt="instagram" />
+		<img src="/icons/Instagram.svg" alt="instagram" />
 	</a>
 	<a href="/impressum" class="impressum">Impressum</a>
 	<span class="copyright">©2025 Sappho Studio.</span>
@@ -22,6 +22,7 @@
 @use '../../styles/base/_variables.sass' as *;
 
 footer
+    margin-top: 35px
     display: flex
     flex-direction: column
     align-items: center
@@ -60,8 +61,8 @@ footer
         color: $black
         font-size: 15px
     .insta_link
-        height: 15px
-        width: 15px
+        height: 0.9375rem
+        width: 0.9375rem
     .impressum
         font-size: 15px
         text-decoration: none
