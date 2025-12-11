@@ -1,10 +1,60 @@
 <script>
+	import Calendar from '$lib/components/Calendar.svelte';
+	import { onMount } from 'svelte';
+
+	let map;
+	let { data } = $props();
+	const events = $derived(data.events);
+
+	onMount(async () => {
+		const L = await import('leaflet');
+		await import('leaflet/dist/leaflet.css');
+
+		map = L.map('map', { scrollWheelZoom: false }).setView([48.218, 16.363], 13);
+
+		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+			attribution:
+				'&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+			subdomains: 'abcd',
+			maxZoom: 19
+		}).addTo(map);
+
+		map.getContainer().addEventListener(
+			'wheel',
+			(e) => {
+				if (e.ctrlKey) {
+					e.preventDefault(); // prevent page scroll
+
+					// calculate zoom delta manually
+					const delta = e.deltaY > 0 ? -1 : 1; // scroll up → zoom in, down → zoom out
+					const currentZoom = map.getZoom();
+					map.setZoom(currentZoom + delta);
+
+					// optionally enable scrollWheelZoom temporarily for smooth scroll
+					// map.scrollWheelZoom.enable();
+				}
+			},
+			{ passive: false }
+		);
+
+		const redIcon = L.icon({
+			iconUrl:
+				'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-red.png',
+			shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+			iconSize: [25, 41],
+			iconAnchor: [12, 41],
+			popupAnchor: [1, -34],
+			shadowSize: [41, 41]
+		});
+
+		L.marker([48.218, 16.363], { icon: redIcon }).addTo(map).bindPopup('Berggasse 16');
+	});
 </script>
 
 <section class="promo">
 	<div class="promo_wrapper">
 		<a href="https://fb.me/e/6g8VfM1pV" class="promo_wrapper_img">
-			<img src="/images/NewYearHorse.jpg" alt="NewYearHorse" />
+			<img src="/images/NewYearHorse.avif" alt="NewYearHorse" />
 		</a>
 		<div class="promo_wrapper_descr">
 			<a href="https://fb.me/e/6g8VfM1pV">
@@ -21,7 +71,7 @@
 <section class="pages">
 	<div class="pages_wrapper">
 		<a href="/all" class="pages_all">
-			<img src="/images/redwhitecubes.jpg" alt="redwhitecubes" class="pages_all_img" />
+			<img src="/images/redwhitecubes.avif" alt="redwhitecubes" class="pages_all_img" />
 			<span class="pages_all_text">Alle Produkte</span>
 		</a>
 		<div class="pages_double_wrapper">
@@ -35,7 +85,7 @@
 			</a>
 		</div>
 		<a href="/gift" class="pages_gift">
-			<img src="/images/CandleBowKnot.jpg" alt="CandleBowKnot" class="pages_gift_img" />
+			<img src="/images/CandleBowKnot.avif" alt="CandleBowKnot" class="pages_gift_img" />
 			<span class="pages_gift_text">Gutschein</span>
 		</a>
 	</div>
@@ -85,43 +135,46 @@
 		</div>
 	</div>
 </section>
+<Calendar {events} initialView={'listMonth'} />
 <section class="contact">
-	<h2 class="title_h2">Contact Us</h2>
 	<div class="contact_wrapper">
-		<div>
-			<h3 class="title_h3">Address</h3>
-			<span class="contact_adress">Berggasse 16, 1090, Vienna, Austria</span>
-		</div>
-		<div>
-			<h3 class="title_h3">Contact</h3>
-			<a href="mailto:office@sapphostudio.shop" class="contact_email">office@sapphostudio.shop</a>
-		</div>
-		<div>
-			<h3 class="title_h3">Follow us</h3>
-			<div class="contact_socials">
-				<a href="https://www.instagram.com/sappho_studio/">
-					<img src="/icons/InstagramColored.svg" alt="instagram" class="contact_socials_insta" />
-				</a>
-				<a href="https://www.facebook.com/sappho.studio/">
-					<img src="/icons/FacebookColored.svg" alt="facebook" class="contact_socials_fb" />
-				</a>
+		<h2 class="title_h2">Contact Us</h2>
+		<div class="contact_inner_wrapper">
+			<div>
+				<h3 class="title_h3">Address</h3>
+				<span class="contact_address">Berggasse 16, 1090, Vienna, Austria</span>
+			</div>
+			<div>
+				<h3 class="title_h3">Contact</h3>
+				<a href="mailto:office@sapphostudio.shop" class="contact_email">office@sapphostudio.shop</a>
+			</div>
+			<div>
+				<h3 class="title_h3">Follow us</h3>
+				<div class="contact_socials">
+					<a
+						href="https://www.instagram.com/sappho_studio/"
+						target="_blank"
+						rel="noopener noreferrer">
+						<img src="/icons/InstagramColored.svg" alt="instagram" class="contact_socials_insta" />
+					</a>
+					<a
+						href="https://www.facebook.com/sappho.studio/"
+						target="_blank"
+						rel="noopener noreferrer">
+						<img src="/icons/FacebookColored.svg" alt="facebook" class="contact_socials_fb" />
+					</a>
+				</div>
 			</div>
 		</div>
-	</div>
-	<div class="contact_map">
-		<iframe
-			title="map"
-			src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2658.400260155524!2d16.3626617!3d48.2181668!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x476d07b96019547b%3A0x3ec637a0f9e4a351!2sBerggasse%2016%2C%201090%20Wien%2C%20Austria!5e0!3m2!1sen!2sua!4v1765226919395!5m2!1sen!2sua"
-			style=""
-			allowfullscreen
-			loading="lazy"
-			referrerpolicy="no-referrer-when-downgrade">
-		</iframe>
+		<div class="contact_map">
+			<div id="map"></div>
+		</div>
 	</div>
 </section>
 
 <style lang="sass">
 @use '../styles/base/_variables.sass' as *;
+	
 
 .promo
 	padding-right: 292px
@@ -238,9 +291,11 @@
 		
 .contact
 	margin-top: 100px
+	display: flex
+	justify-content: center
 	.title_h2
 		text-align: center
-	&_wrapper
+	&_inner_wrapper
 		margin: 60px auto 0 auto
 		display: flex
 		width: 924px
@@ -249,7 +304,7 @@
 			margin-left: 50px
 		.title_h3
 			font-size: 26px	
-	&_adress, &_email, &_socials
+	&_address, &_email, &_socials
 		display: block
 		margin-top: 27px
 		text-decoration: none
@@ -268,9 +323,7 @@
 		margin: 35px auto 0 auto
 		width: 980px
 		height: 350px
-		iframe
-			border: none
-			width: 100%
+		#map
 			height: 100%
 
 </style>

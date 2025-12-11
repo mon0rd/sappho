@@ -53,7 +53,7 @@ footer
                 &::placeholder
                     color: $black
         .black_btn
-            font-family: Arian, sans-serif
+            font-family: Arian, Arial, sans-serif
             margin-top: 7px
     .mailto
         margin-top: 102px

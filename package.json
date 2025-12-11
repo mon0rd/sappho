@@ -33,8 +33,12 @@
 		"vite-plugin-devtools-json": "^1.0.0"
 	},
 	"dependencies": {
+		"@fullcalendar/core": "^6.1.19",
+		"@fullcalendar/daygrid": "^6.1.19",
+		"@fullcalendar/interaction": "^6.1.19",
+		"@fullcalendar/list": "^6.1.19",
 		"@wix/data": "^1.0.350",
-		"@wix/sdk": "^1.17.4",
-		"@wix/stores": "^1.0.569"
+		"@wix/stores": "^1.0.569",
+		"leaflet": "^1.9.4"
 	}
 }

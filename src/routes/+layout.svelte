@@ -8,7 +8,7 @@
 	let progress = $state(0);
 	const maxHeight = 228;
 	const scrollRange = 40;
-	const scrollDelay = 150;
+	const scrollDelay = 0;
 	function handleScroll() {
 		const y = window.scrollY;
 		progress = Math.min(Math.max((y - scrollDelay) / scrollRange, 0), 1);
@@ -16,6 +16,8 @@
 
 	onMount(() => {
 		window.addEventListener('scroll', handleScroll);
+		handleScroll();
+
 		return () => window.removeEventListener('scroll', handleScroll);
 	});
 
