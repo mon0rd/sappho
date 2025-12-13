@@ -9,6 +9,7 @@
 	const maxHeight = 228;
 	const scrollRange = 40;
 	const scrollDelay = 0;
+	
 	function handleScroll() {
 		const y = window.scrollY;
 		progress = Math.min(Math.max((y - scrollDelay) / scrollRange, 0), 1);

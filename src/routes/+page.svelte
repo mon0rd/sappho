@@ -1,54 +1,9 @@
 <script>
 	import Calendar from '$lib/components/Calendar.svelte';
+	import Map from '$lib/components/Map.svelte';
 	import { onMount } from 'svelte';
 
-	let map;
 	let { data } = $props();
-	const events = $derived(data.events);
-
-	onMount(async () => {
-		const L = await import('leaflet');
-		await import('leaflet/dist/leaflet.css');
-
-		map = L.map('map', { scrollWheelZoom: false }).setView([48.218, 16.363], 13);
-
-		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-			attribution:
-				'&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
-			subdomains: 'abcd',
-			maxZoom: 19
-		}).addTo(map);
-
-		map.getContainer().addEventListener(
-			'wheel',
-			(e) => {
-				if (e.ctrlKey) {
-					e.preventDefault(); // prevent page scroll
-
-					// calculate zoom delta manually
-					const delta = e.deltaY > 0 ? -1 : 1; // scroll up → zoom in, down → zoom out
-					const currentZoom = map.getZoom();
-					map.setZoom(currentZoom + delta);
-
-					// optionally enable scrollWheelZoom temporarily for smooth scroll
-					// map.scrollWheelZoom.enable();
-				}
-			},
-			{ passive: false }
-		);
-
-		const redIcon = L.icon({
-			iconUrl:
-				'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-red.png',
-			shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-			iconSize: [25, 41],
-			iconAnchor: [12, 41],
-			popupAnchor: [1, -34],
-			shadowSize: [41, 41]
-		});
-
-		L.marker([48.218, 16.363], { icon: redIcon }).addTo(map).bindPopup('Berggasse 16');
-	});
 </script>
 
 <section class="promo">
@@ -135,7 +90,18 @@
 		</div>
 	</div>
 </section>
-<Calendar {events} initialView={'listMonth'} />
+<section class="events">
+	<a href="/events"><h2 class="title_h2">Bevorstehende Veranstaltungen</h2></a>
+	<div class="calendar">
+		{#await data.events}
+			<div class="spinner"></div>
+		{:then events}
+			<Calendar {events} initialView={'listMonth'} validRange={{ start: new Date() }} />
+		{:catch}
+			<p style="text-align: center; font-size: 24px">Failed to load events</p>
+		{/await}
+	</div>
+</section>
 <section class="contact">
 	<div class="contact_wrapper">
 		<h2 class="title_h2">Contact Us</h2>
@@ -167,14 +133,13 @@
 			</div>
 		</div>
 		<div class="contact_map">
-			<div id="map"></div>
+			<Map />
 		</div>
 	</div>
 </section>
 
 <style lang="sass">
-@use '../styles/base/_variables.sass' as *;
-	
+@use '../styles/base/_variables.sass' as *;	
 
 .promo
 	padding-right: 292px
@@ -288,7 +253,14 @@
 	&_workshops
 		&_img
 			object-position: 0 20%
-		
+
+.events
+	margin-top: 100px
+	a
+		text-align: center
+		text-decoration: none
+		color: inherit
+
 .contact
 	margin-top: 100px
 	display: flex
@@ -323,7 +295,5 @@
 		margin: 35px auto 0 auto
 		width: 980px
 		height: 350px
-		#map
-			height: 100%
 
 </style>

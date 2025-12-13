@@ -1,18 +1,23 @@
 <script>
 	import Calendar from '$lib/components/Calendar.svelte';
 	let { data } = $props();
-	const events = $derived(data.events);
 </script>
 
-<h2 class="title_h2">events page</h2>
-<Calendar {events} />
+<h2 class="title_h2">Bevorstehende Veranstaltungen</h2>
+<div class="calendar">
+	{#await data.events}
+		<div class="spinner"></div>
+	{:then events}
+		<Calendar {events} />
+	{:catch}
+		<p style="text-align: center; font-size: 24px">Failed to load events</p>
+	{/await}
+</div>
 
-<!-- <script>
-	import Calendar from '$lib/components/Calendar.svelte';
-
-	export let data;
-	let events = data.events || [];
-</script>
-
-<h2 class="title_h2">events page</h2>
-<Calendar {events} /> -->
+<style lang="sass">
+.title_h2
+	text-align: center
+.calendar
+	margin-top: 50px
+	text-align: center
+</style>
