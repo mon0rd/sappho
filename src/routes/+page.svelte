@@ -8,14 +8,14 @@
 
 <section class="promo">
 	<div class="promo_wrapper">
-		<a href="https://fb.me/e/6g8VfM1pV" class="promo_wrapper_img">
+		<a href="https://fb.me/e/6g8VfM1pV" class="promo_wrapper_img" target="_blank">
 			<img src="/images/NewYearHorse.avif" alt="NewYearHorse" />
 		</a>
 		<div class="promo_wrapper_descr">
-			<a href="https://fb.me/e/6g8VfM1pV">
+			<a href="https://fb.me/e/6g8VfM1pV" target="_blank">
 				<h2 class="title_h2">Kreativer Pop-Up:<br />Kerzen & Keramik</h2>
 			</a>
-			<a href="https://fb.me/e/6g8VfM1pV">
+			<a href="https://fb.me/e/6g8VfM1pV" target="_blank">
 				<h3 class="title_h3">
 					8.-12. Dezember<br />12:00 - 19:00<br />Wiener Straße 13, St. Pölten
 				</h3>
@@ -144,10 +144,12 @@
 .promo
 	padding-right: 292px
 	&_wrapper
+		pointer-events: none
 		display: flex
 		width: 100%   
 		justify-content: center
 		&_img
+			pointer-events: auto
 			min-width: 850px
 			height: 515px
 			overflow: hidden
@@ -164,6 +166,7 @@
 			padding: 38px 0
 			margin-left: -100px
 			a
+				pointer-events: auto
 				text-decoration: none
 				color: inherit
 				width: max-content
