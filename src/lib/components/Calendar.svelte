@@ -7,7 +7,7 @@
 	let calendarEl;
 	let calendar;
 	let loading = $state(true);
-	let modal = $state({ events: [], position: { top: 0, left: 0 }, open: false });
+	let modal = $state({ events: [], position: {}, open: false });
 
 	onMount(async () => {
 		const { Calendar } = await import('@fullcalendar/core');
@@ -52,10 +52,8 @@
 
 				if (clickedDay.length) {
 					const rect = info.dayEl.getBoundingClientRect();
-
-					const MODAL_WIDTH = rect.width * 2;
-
-					const left = rect.left - MODAL_WIDTH >= 0 ? rect.left - MODAL_WIDTH : rect.right;
+					const row = info.dayEl.parentElement.rowIndex + 1;
+					const column = info.dayEl.cellIndex + 1;
 
 					if (modal.open && modal.events[0]?.start.startsWith(info.dateStr)) {
 						modal = { ...modal, open: false, events: [] };
@@ -64,27 +62,37 @@
 							open: true,
 							events: clickedDay,
 							position: {
-								top: rect.top + window.scrollY,
-								left,
-								width: rect.width,
-								height: rect.height
+								row,
+								column,
+								rect
 							}
 						};
 					}
 				}
+			},
+			datesSet() {
+				modal = {
+					...modal,
+					open: false,
+					events: []
+				};
+			},
+			dayCellClassNames(info) {
+				const dateStr = info.date.toLocaleDateString('en-CA');
+
+				const event = events.find((e) => e.start.startsWith(dateStr));
+
+				if (!event) return [];
+
+				return event.thumbnail ? ['has-event-thumbnail'] : ['has-event'];
 			},
 			dayCellDidMount(info) {
 				const dateStr = info.date.toLocaleDateString('en-CA');
 
 				const event = events.find((e) => e.start.startsWith(dateStr));
 
-				if (event) {
-					if (event?.thumbnail) {
-						info.el.classList.add('has-event-thumbnail');
-						info.el.style.setProperty('--day-bg', `url(${event.thumbnail})`);
-					} else {
-						info.el.classList.add('has-event');
-					}
+				if (event?.thumbnail) {
+					info.el.style.setProperty('--day-bg', `url(${event.thumbnail})`);
 				}
 			},
 			noEventsText: 'Keine bevorstehenden Veranstaltungen'
@@ -127,7 +135,6 @@
 	align-items: center
 	justify-content: center
 	justify-self: center
-	gap: 32px
 	margin: 0 auto
 
 :global(.fc)
@@ -183,6 +190,8 @@
 	font-size: 12px
 
 :global(.fc .fc-toolbar-title)
+	min-width: 173px
+	text-align: center
 	font-size: 18px
 	line-height: 27px
 

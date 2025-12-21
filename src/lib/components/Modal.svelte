@@ -1,10 +1,42 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { fade } from 'svelte/transition';
 
 	let { events, position, modalClose } = $props();
 
 	let selectedEvent = $state(null);
+
+	let modalEl;
+
+	const calcPosition = $derived(() => {
+		const modalWidth = position.rect.width * 2;
+		const modalHeight =
+			!selectedEvent && events.length > 1 ? position.rect.height : position.rect.height * 3;
+		const left = position.column > 3 ? position.rect.left - modalWidth : position.rect.right;
+		let top;
+		switch (true) {
+			case position.row === 1:
+				top = position.rect.top + window.scrollY;
+				break;
+			case position.row > 1 && position.row < 5:
+				top =
+					!selectedEvent && events.length > 1
+						? position.rect.top + window.scrollY
+						: position.rect.top + window.scrollY - modalHeight / 3;
+				break;
+			case position.row === 5:
+				top = position.rect.bottom + window.scrollY - modalHeight;
+				break;
+			default:
+				break;
+		}
+		return {
+			top,
+			left,
+			width: modalWidth - 42,
+			height: modalHeight - 42
+		};
+	});
 
 	function showEvent(event) {
 		selectedEvent = event;
@@ -43,20 +75,42 @@
 			});
 	});
 
+	function onKeydown(e) {
+		if (e.key === 'Escape') {
+			modalClose();
+		}
+	}
+
+	function handleClick(e) {
+		if (modalEl && !modalEl.contains(e.target)) {
+			modalClose();
+		}
+	}
+
+	onMount(() => {
+		window.addEventListener('keydown', onKeydown);
+		document.addEventListener('mousedown', handleClick, true);
+	});
+
+	onDestroy(() => {
+		window.removeEventListener('keydown', onKeydown);
+		document.removeEventListener('mousedown', handleClick, true);
+	});
+
 	$effect(() => {
 		events;
 		selectedEvent = null;
 	});
-
 </script>
 
 <div
 	class="modal"
+	bind:this={modalEl}
 	style="
-		top: {position.top}px;
-		left: {position.left}px;
-		width: {position.width * 2 - 41}px;
-		height: {position.height * 3 - 41}px;
+		top: {calcPosition().top}px;
+		left: {calcPosition().left}px;
+		width: {calcPosition().width}px;
+		height: {calcPosition().height}px;
 	"
 	role="dialog"
 	aria-modal="true"
@@ -203,6 +257,9 @@
 		&_img
 			border: 1px solid black
 			margin-top: 12px
+			object-fit: cover
+			max-height: 250px
+			width: 100%
 		&_status
 			margin-top: 32px
 			border: 1px solid black
