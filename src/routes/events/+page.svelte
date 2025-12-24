@@ -5,10 +5,10 @@
 
 <h2 class="title_h2">Bevorstehende Veranstaltungen</h2>
 <div class="calendar">
-	{#await data.events}
+	{#await data.upcomingEvents}
 		<div class="spinner"></div>
-	{:then events}
-		<Calendar {events} />
+	{:then upcomingEvents}
+		<Calendar {upcomingEvents} />
 	{:catch}
 		<p style="text-align: center; font-size: 24px">Failed to load events</p>
 	{/await}

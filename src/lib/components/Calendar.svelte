@@ -1,19 +1,109 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
+	import {
+		startOfMonth,
+		endOfMonth,
+		subMonths,
+		addMonths,
+		formatISO,
+		startOfWeek,
+		endOfWeek
+	} from 'date-fns';
 	import Modal from './Modal.svelte';
 
-	let { events, initialView } = $props();
+	let { upcomingEvents, initialView } = $props();
 
-	let calendarEl;
+	let eventsCache = {};
+	let events = $derived(initialView === 'listMonth' ? upcomingEvents : []);
+
 	let calendar;
-	let loading = $state(true);
+	let calendarEl;
+	let selectedDay = null;
+	let selectedDayEl = null;
 	let modal = $state({ events: [], position: {}, open: false });
+	let modalEl = $state();
+	let loading = $state(true);
+
+	function monthKey(date) {
+		const d = new Date(date);
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+	}
+
+	function mergeEvents(newEvents) {
+		events = [
+			...events.filter(
+				(e) => !newEvents.find((ne) => ne.start === e.start && ne.title === e.title)
+			),
+			...newEvents
+		];
+	}
+
+	function formatDateForBackend(date) {
+		const d = new Date(date);
+		const yyyy = d.getFullYear();
+		const mm = String(d.getMonth() + 1).padStart(2, '0');
+		const dd = String(d.getDate()).padStart(2, '0');
+		return `${yyyy}-${mm}-${dd}`;
+	}
+
+	async function fetchMonthEvents(startDate, endDate) {
+		const start = formatDateForBackend(startDate);
+		const end = formatDateForBackend(endDate);
+
+		const res = await fetch(
+			`https://sapphostudio.shop/_functions/events?start=${start}&end=${end}`
+		);
+		if (!res.ok) return [];
+		return res.json();
+	}
+
+	function closeModal() {
+		if (selectedDayEl) {
+			selectedDayEl.classList.remove('selected');
+			selectedDayEl = null;
+		}
+		modal = { ...modal, open: false, events: [] };
+		selectedDay = null;
+	}
+
+	function handleClick(e) {
+		if (modal.open && !modalEl?.contains(e.target) && !selectedDayEl?.contains(e.target))
+			closeModal();
+	}
+
+	function handleKey(e) {
+		if (e.key === 'Escape') {
+			closeModal();
+		}
+	}
 
 	onMount(async () => {
 		const { Calendar } = await import('@fullcalendar/core');
 		const dayGridPlugin = (await import('@fullcalendar/daygrid')).default;
 		const listPlugin = (await import('@fullcalendar/list')).default;
 		const interactionPlugin = (await import('@fullcalendar/interaction')).default;
+
+		if (initialView !== 'listMonth') {
+			const today = new Date();
+			const firstMonth = subMonths(today, 1);
+			const lastMonth = addMonths(today, 1);
+
+			// Single fetch for the full range
+			const start = formatISO(startOfWeek(startOfMonth(firstMonth), { weekStartsOn: 1 }));
+			const end = formatISO(endOfWeek(endOfMonth(lastMonth), { weekStartsOn: 1 }));
+			const allEvents = await fetchMonthEvents(start, end);
+
+			// Cache per month
+			for (let month = firstMonth; month <= lastMonth; month = addMonths(month, 1)) {
+				const key = monthKey(month);
+				eventsCache[key] = allEvents.filter((e) =>
+					e.start.startsWith(formatDateForBackend(month).slice(0, 7))
+				);
+			}
+
+			// Merge all events
+			mergeEvents(allEvents);
+		}
 
 		calendar = new Calendar(calendarEl, {
 			plugins: [dayGridPlugin, interactionPlugin, listPlugin],
@@ -24,57 +114,56 @@
 			firstDay: 1,
 			fixedWeekCount: false,
 			dayMaxEvents: 1,
-			headerToolbar: {
-				left: '',
-				center: 'prev,title,next',
-				right: 'today'
-			},
+			headerToolbar:
+				initialView === 'listMonth'
+					? 'none'
+					: {
+							left: '',
+							center: 'prev,title,next',
+							right: 'today'
+						},
 			buttonText: {
 				today: 'Heute'
 			},
 			eventContent(arg) {
-				const eventDate = arg.event.start.toLocaleDateString('en-CA');
-
+				const thumbnail = arg.event.extendedProps.thumbnail;
 				const time = arg.event.start.toLocaleTimeString('de-DE', {
 					hour: '2-digit',
 					minute: '2-digit'
 				});
 
 				return {
-					html: `<div>
-					<span class="event-time">${time}</span><br/>
-					<span class="event-title">${arg.event.title}</span>
-           			</div>`
+					html: `
+						<div class="event-wrapper" style="--thumbnail: url('${thumbnail || ''}')">
+							<span class="event-time">${time}</span><br/>
+							<span class="event-title">${arg.event.title}</span>
+						</div>`
 				};
 			},
 			dateClick(info) {
 				const clickedDay = events.filter((e) => e.start.startsWith(info.dateStr));
+				if (!clickedDay.length) return;
 
-				if (clickedDay.length) {
-					const rect = info.dayEl.getBoundingClientRect();
-					const row = info.dayEl.parentElement.rowIndex + 1;
-					const column = info.dayEl.cellIndex + 1;
+				const row = info.dayEl.parentElement.rowIndex + 1;
+				const column = info.dayEl.cellIndex + 1;
 
-					if (modal.open && modal.events[0]?.start.startsWith(info.dateStr)) {
-						modal = { ...modal, open: false, events: [] };
-					} else {
-						modal = {
-							open: true,
-							events: clickedDay,
-							position: {
-								row,
-								column,
-								rect
-							}
-						};
-					}
+				if (modal.open && selectedDay === info.dateStr) {
+					closeModal();
+					return;
 				}
-			},
-			datesSet() {
+
+				if (selectedDayEl) {
+					selectedDayEl.classList.remove('selected');
+				}
+
+				info.dayEl.classList.add('selected');
+				selectedDayEl = info.dayEl;
+				selectedDay = info.dateStr;
+
 				modal = {
-					...modal,
-					open: false,
-					events: []
+					open: true,
+					events: clickedDay,
+					position: { row, column, dayEl: info.dayEl }
 				};
 			},
 			dayCellClassNames(info) {
@@ -84,15 +173,44 @@
 
 				if (!event) return [];
 
-				return event.thumbnail ? ['has-event-thumbnail'] : ['has-event'];
+				const classes = [];
+				classes.push(event.thumbnail ? 'has-event-thumbnail' : 'has-event');
+
+				return classes;
 			},
 			dayCellDidMount(info) {
 				const dateStr = info.date.toLocaleDateString('en-CA');
 
 				const event = events.find((e) => e.start.startsWith(dateStr));
 
-				if (event?.thumbnail) {
-					info.el.style.setProperty('--day-bg', `url(${event.thumbnail})`);
+				// if (event?.thumbnail) {
+				// 	info.el.style.setProperty('--day-bg', `url(${event.thumbnail})`);
+				// }
+			},
+			datesSet: async (info) => {
+				if (initialView === 'listMonth') return;
+
+				const startMonth = startOfMonth(info.start);
+				const endMonth = endOfMonth(info.end);
+
+				const monthsToCheck = [
+					subMonths(startMonth, 1),
+					...Array.from({ length: info.end.getMonth() - info.start.getMonth() + 1 }, (_, i) =>
+						addMonths(startMonth, i)
+					)
+				];
+
+				for (const month of monthsToCheck) {
+					const key = monthKey(month);
+					if (!eventsCache[key]) {
+						const start = formatDateForBackend(startOfMonth(month));
+						const end = formatDateForBackend(endOfMonth(month));
+						const monthEvents = await fetchMonthEvents(start, end);
+						eventsCache[key] = monthEvents;
+						mergeEvents(monthEvents);
+						calendar.removeAllEventSources();
+						calendar.addEventSource(events);
+					}
 				}
 			},
 			noEventsText: 'Keine bevorstehenden Veranstaltungen'
@@ -100,6 +218,14 @@
 
 		calendar.render();
 		loading = false;
+
+		document.addEventListener('mousedown', handleClick);
+		window.addEventListener('keydown', handleKey);
+	});
+
+	onDestroy(() => {
+		document.removeEventListener('mousedown', handleClick);
+		window.removeEventListener('keydown', handleKey);
 	});
 </script>
 
@@ -112,12 +238,7 @@
 </div>
 
 {#if modal.open}
-	<Modal
-		events={modal.events}
-		position={modal.position}
-		modalClose={() => {
-			modal = { ...modal, open: false };
-		}} />
+	<Modal bind:modalEl events={modal.events} position={modal.position} {closeModal} />
 {/if}
 
 <style lang="sass">
@@ -226,6 +347,7 @@
 
 :global(.fc .fc-daygrid-body-natural .fc-daygrid-day-events)
 	margin: 0
+	min-height: 100%
 
 :global(.fc .fc-daygrid-day-number)
 	padding: 0
@@ -246,11 +368,27 @@
 
 :global(.fc .fc-event)
 	display: block
+	
+:global(.fc .fc-event .event-wrapper)
+	position: relative
+	height: 100%
+	width: 100%
+	background-image: var(--thumbnail)
+	background-size: cover
+	background-position: center top
+	display: flex
+	flex-direction: column
+	justify-content: flex-end
+
+:global(.fc .fc-h-event)
+	background-color: inherit
+	border: none
 
 :global(.fc .fc-event .event-title)
 	display: block
 	overflow: hidden
 	text-overflow: ellipsis
+	color: $black
 
 :global(.fc .fc-daygrid-day)
 	height: 224px
@@ -271,17 +409,17 @@
 :global(.fc .fc-daygrid-day.has-event-thumbnail)
 	cursor: pointer
 	transition: background-color 0.28s linear
-	&::after
-		content: ''
-		position: absolute
-		bottom: 4px
-		left: 4px
-		right: 4px
-		height: 50%
-		background-image: var(--day-bg)
-		background-size: cover
-		background-position: top
-		pointer-events: none
+	// &::after
+	// 	content: ''
+	// 	position: absolute
+	// 	bottom: 4px
+	// 	left: 4px
+	// 	right: 4px
+	// 	height: 50%
+	// 	background-image: var(--day-bg)
+	// 	background-size: cover
+	// 	background-position: top
+	// 	pointer-events: none
 	&::before
 		content: ''
 		position: absolute
@@ -293,6 +431,9 @@
 		pointer-events: none
 		z-index: 1
 	&:hover
+		background-color: rgba(24, 24, 24, 0.2)
+		
+:global(.fc .selected)
 		background-color: rgba(24, 24, 24, 0.2)
 
 :global(.fc .fc-daygrid-day.has-event)

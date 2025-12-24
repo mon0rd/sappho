@@ -1,6 +1,6 @@
 export function load({ fetch }) {
 	return {
-		events: fetch('https://sapphostudio.shop/_functions/events?mode=all', {
+		upcomingEvents: fetch('https://sapphostudio.shop/_functions/events?mode=upcoming', {
 			headers: {
 				accept: 'application/json'
 			}

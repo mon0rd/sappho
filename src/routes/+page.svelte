@@ -93,10 +93,10 @@
 <section class="events">
 	<a href="/events"><h2 class="title_h2">Bevorstehende Veranstaltungen</h2></a>
 	<div class="calendar">
-		{#await data.events}
+		{#await data.upcomingEvents}
 			<div class="spinner"></div>
-		{:then events}
-			<Calendar {events} initialView={'listMonth'} validRange={{ start: new Date() }} />
+		{:then upcomingEvents}
+			<Calendar {upcomingEvents} initialView={'listMonth'} validRange={{ start: new Date() }} />
 		{:catch}
 			<p style="text-align: center; font-size: 24px">Failed to load events</p>
 		{/await}

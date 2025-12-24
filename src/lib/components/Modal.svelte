@@ -1,31 +1,33 @@
 <script>
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 
-	let { events, position, modalClose } = $props();
+	let { events, position, closeModal, modalEl = $bindable() } = $props();
 
 	let selectedEvent = $state(null);
 
-	let modalEl;
+	const rect = $derived(() => {
+		return position.dayEl?.getBoundingClientRect();
+	});
 
 	const calcPosition = $derived(() => {
-		const modalWidth = position.rect.width * 2;
-		const modalHeight =
-			!selectedEvent && events.length > 1 ? position.rect.height : position.rect.height * 3;
-		const left = position.column > 3 ? position.rect.left - modalWidth : position.rect.right;
+		if (!rect()) return {};
+		const modalWidth = rect().width * 2;
+		const modalHeight = !selectedEvent && events.length > 1 ? rect().height : rect().height * 3;
+		const left = position.column > 3 ? rect().left - modalWidth : rect().right;
 		let top;
 		switch (true) {
 			case position.row === 1:
-				top = position.rect.top + window.scrollY;
+				top = rect().top + window.scrollY;
 				break;
 			case position.row > 1 && position.row < 5:
 				top =
 					!selectedEvent && events.length > 1
-						? position.rect.top + window.scrollY
-						: position.rect.top + window.scrollY - modalHeight / 3;
+						? rect().top + window.scrollY
+						: rect().top + window.scrollY - modalHeight / 3;
 				break;
 			case position.row === 5:
-				top = position.rect.bottom + window.scrollY - modalHeight;
+				top = rect().bottom + window.scrollY - modalHeight;
 				break;
 			default:
 				break;
@@ -33,8 +35,8 @@
 		return {
 			top,
 			left,
-			width: modalWidth - 42,
-			height: modalHeight - 42
+			width: modalWidth - 41,
+			height: modalHeight - 41
 		};
 	});
 
@@ -75,28 +77,6 @@
 			});
 	});
 
-	function onKeydown(e) {
-		if (e.key === 'Escape') {
-			modalClose();
-		}
-	}
-
-	function handleClick(e) {
-		if (modalEl && !modalEl.contains(e.target)) {
-			modalClose();
-		}
-	}
-
-	onMount(() => {
-		window.addEventListener('keydown', onKeydown);
-		document.addEventListener('mousedown', handleClick, true);
-	});
-
-	onDestroy(() => {
-		window.removeEventListener('keydown', onKeydown);
-		document.removeEventListener('mousedown', handleClick, true);
-	});
-
 	$effect(() => {
 		events;
 		selectedEvent = null;
@@ -104,19 +84,46 @@
 </script>
 
 <div
-	class="modal"
+	class="modal {position.column > 3 ? 'arrow-right' : 'arrow-left'}"
 	bind:this={modalEl}
 	style="
 		top: {calcPosition().top}px;
 		left: {calcPosition().left}px;
 		width: {calcPosition().width}px;
 		height: {calcPosition().height}px;
-	"
+--arrow-top: {rect().top + window.scrollY + rect().height / 2 - calcPosition().top}px;	"
 	role="dialog"
 	aria-modal="true"
 	in:fade={{ duration: 280 }}
 	out:fade={{ duration: 280 }}>
-	<button class="modal_close" onclick={modalClose} aria-label="Close modal">
+	{#if position.column > 3}
+		<svg
+			class="arrow-right"
+			xmlns="http://www.w3.org/2000/svg"
+			width="10"
+			height="18"
+			viewBox="0 0 10 18"
+			aria-hidden="true"
+			focusable="false">
+			<rect x="-2" y="0" width="2" height="18" fill="#F7F2ED" />
+			<polygon points="0,0 10,10 0,18" fill="#F7F2ED" stroke="#000" stroke-width="0" />
+			<path d="M0,0 L10,10 L0,18" stroke="#000" stroke-width="1.2" fill="none" />
+		</svg>
+	{:else}
+		<svg
+			class="arrow-left"
+			xmlns="http://www.w3.org/2000/svg"
+			width="10"
+			height="18"
+			viewBox="0 0 10 18"
+			aria-hidden="true"
+			focusable="false">
+			<rect x="9" y="0" width="2" height="18" fill="#F7F2ED" />
+			<polygon points="10,0 0,10 10,18" fill="#F7F2ED" />
+			<path d="M10,0 L0,10 L10,18" stroke="#000" stroke-width="1.2" fill="none" />
+		</svg>
+	{/if}
+	<button class="modal_close" onclick={closeModal} aria-label="Close modal">
 		<svg viewBox="0 0 24 24">
 			<path
 				d="M17 6 12.001 10.999 7 6 6 7 11.001 11.999 6 17 7 18 12.001 12.999 17 18 18 17 13 11.999 18 7z">
@@ -178,8 +185,10 @@
 
 <style lang="sass">
 @use '../../styles/base/_variables.sass' as *;
+
 .modal
 	border: none
+	box-shadow: inset 0 0 0 .4px $black
 	z-index: 899
 	padding: 20px
 	position: absolute
@@ -293,5 +302,17 @@
 			text-decoration: none
 			&:hover
 				text-decoration: underline
+	.arrow-left, .arrow-right
+		overflow: visible
+		position: absolute
+		z-index: 950
+		top: var(--arrow-top)
+		width: 10px
+		height: 18px
+		pointer-events: none
+	.arrow-left
+		left: -10px
+	.arrow-right
+		right: -10px
 
 </style>
