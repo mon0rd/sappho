@@ -39,7 +39,6 @@
 		"@fullcalendar/list": "^6.1.19",
 		"@wix/data": "^1.0.350",
 		"@wix/stores": "^1.0.569",
-		"date-fns": "^4.1.0",
 		"leaflet": "^1.9.4"
 	}
 }

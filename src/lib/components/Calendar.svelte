@@ -1,20 +1,13 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
-	import {
-		startOfMonth,
-		endOfMonth,
-		subMonths,
-		addMonths,
-		formatISO,
-		startOfWeek,
-		endOfWeek
-	} from 'date-fns';
+	import { loadCalendarGrids, useEvents } from '$lib/services/events.service.svelte.js';
 	import Modal from './Modal.svelte';
 
 	let { upcomingEvents, initialView } = $props();
 
-	let eventsCache = {};
-	let events = $derived(initialView === 'listMonth' ? upcomingEvents : []);
+	const eventsState = useEvents();
+	let events = $derived(initialView === 'listMonth' ? upcomingEvents : eventsState.events);
+	let loading = $derived(eventsState.loading);
 
 	let calendar;
 	let calendarEl;
@@ -22,40 +15,6 @@
 	let selectedDayEl = null;
 	let modal = $state({ events: [], position: {}, open: false });
 	let modalEl = $state();
-	let loading = $state(true);
-
-	function monthKey(date) {
-		const d = new Date(date);
-		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-	}
-
-	function mergeEvents(newEvents) {
-		events = [
-			...events.filter(
-				(e) => !newEvents.find((ne) => ne.start === e.start && ne.title === e.title)
-			),
-			...newEvents
-		];
-	}
-
-	function formatDateForBackend(date) {
-		const d = new Date(date);
-		const yyyy = d.getFullYear();
-		const mm = String(d.getMonth() + 1).padStart(2, '0');
-		const dd = String(d.getDate()).padStart(2, '0');
-		return `${yyyy}-${mm}-${dd}`;
-	}
-
-	async function fetchMonthEvents(startDate, endDate) {
-		const start = formatDateForBackend(startDate);
-		const end = formatDateForBackend(endDate);
-
-		const res = await fetch(
-			`https://sapphostudio.shop/_functions/events?start=${start}&end=${end}`
-		);
-		if (!res.ok) return [];
-		return res.json();
-	}
 
 	function closeModal() {
 		if (selectedDayEl) {
@@ -83,27 +42,7 @@
 		const listPlugin = (await import('@fullcalendar/list')).default;
 		const interactionPlugin = (await import('@fullcalendar/interaction')).default;
 
-		if (initialView !== 'listMonth') {
-			const today = new Date();
-			const firstMonth = subMonths(today, 1);
-			const lastMonth = addMonths(today, 1);
-
-			// Single fetch for the full range
-			const start = formatISO(startOfWeek(startOfMonth(firstMonth), { weekStartsOn: 1 }));
-			const end = formatISO(endOfWeek(endOfMonth(lastMonth), { weekStartsOn: 1 }));
-			const allEvents = await fetchMonthEvents(start, end);
-
-			// Cache per month
-			for (let month = firstMonth; month <= lastMonth; month = addMonths(month, 1)) {
-				const key = monthKey(month);
-				eventsCache[key] = allEvents.filter((e) =>
-					e.start.startsWith(formatDateForBackend(month).slice(0, 7))
-				);
-			}
-
-			// Merge all events
-			mergeEvents(allEvents);
-		}
+		await waitForHydration();
 
 		calendar = new Calendar(calendarEl, {
 			plugins: [dayGridPlugin, interactionPlugin, listPlugin],
@@ -125,8 +64,35 @@
 			buttonText: {
 				today: 'Heute'
 			},
+			eventSources: [
+				{
+					id: 'events',
+					events: (info, success) => {
+						success(eventsState.events);
+					}
+				}
+			],
+			datesSet: async (info) => {
+				const months = [
+					info.view.currentStart,
+					new Date(info.view.currentStart.getFullYear(), info.view.currentStart.getMonth() - 1, 1),
+					new Date(info.view.currentStart.getFullYear(), info.view.currentStart.getMonth() + 1, 1)
+				];
+
+				const didLoad = await loadCalendarGrids(months);
+
+				if (didLoad) {
+					calendar.getEventSourceById('events')?.refetch();
+				}
+			},
 			eventContent(arg) {
-				const thumbnail = arg.event.extendedProps.thumbnail;
+				const thumbnail =
+					initialView !== 'listMonth' && arg.event.extendedProps.thumbnail
+						? `	<div class="thumbnail-wrapper">
+								<img src="${arg.event.extendedProps.thumbnail}" alt="thumbnail">
+							</div>`
+						: '';
+
 				const time = arg.event.start.toLocaleTimeString('de-DE', {
 					hour: '2-digit',
 					minute: '2-digit'
@@ -134,23 +100,22 @@
 
 				return {
 					html: `
-						<div class="event-wrapper" style="--thumbnail: url('${thumbnail || ''}')">
-							<span class="event-time">${time}</span><br/>
-							<span class="event-title">${arg.event.title}</span>
+						<div class="event-wrapper">
+							<div>
+								<span class="event-time">${time}</span><br/>
+								<span class="event-title">${arg.event.title}</span>
+							</div>
+							${thumbnail}				
 						</div>`
 				};
 			},
 			dateClick(info) {
+				if (modal.open && selectedDay === info.dateStr) return closeModal();
 				const clickedDay = events.filter((e) => e.start.startsWith(info.dateStr));
 				if (!clickedDay.length) return;
 
 				const row = info.dayEl.parentElement.rowIndex + 1;
 				const column = info.dayEl.cellIndex + 1;
-
-				if (modal.open && selectedDay === info.dateStr) {
-					closeModal();
-					return;
-				}
 
 				if (selectedDayEl) {
 					selectedDayEl.classList.remove('selected');
@@ -178,51 +143,13 @@
 
 				return classes;
 			},
-			dayCellDidMount(info) {
-				const dateStr = info.date.toLocaleDateString('en-CA');
-
-				const event = events.find((e) => e.start.startsWith(dateStr));
-
-				// if (event?.thumbnail) {
-				// 	info.el.style.setProperty('--day-bg', `url(${event.thumbnail})`);
-				// }
-			},
-			datesSet: async (info) => {
-				if (initialView === 'listMonth') return;
-
-				const startMonth = startOfMonth(info.start);
-				const endMonth = endOfMonth(info.end);
-
-				const monthsToCheck = [
-					subMonths(startMonth, 1),
-					...Array.from({ length: info.end.getMonth() - info.start.getMonth() + 1 }, (_, i) =>
-						addMonths(startMonth, i)
-					)
-				];
-
-				for (const month of monthsToCheck) {
-					const key = monthKey(month);
-					if (!eventsCache[key]) {
-						const start = formatDateForBackend(startOfMonth(month));
-						const end = formatDateForBackend(endOfMonth(month));
-						const monthEvents = await fetchMonthEvents(start, end);
-						eventsCache[key] = monthEvents;
-						mergeEvents(monthEvents);
-						calendar.removeAllEventSources();
-						calendar.addEventSource(events);
-					}
-				}
-			},
 			noEventsText: 'Keine bevorstehenden Veranstaltungen'
 		});
-
 		calendar.render();
-		loading = false;
 
 		document.addEventListener('mousedown', handleClick);
 		window.addEventListener('keydown', handleKey);
 	});
-
 	onDestroy(() => {
 		document.removeEventListener('mousedown', handleClick);
 		window.removeEventListener('keydown', handleKey);
@@ -232,6 +159,7 @@
 {#if loading}
 	<div class="spinner"></div>
 {/if}
+
 <div
 	bind:this={calendarEl}
 	style="visibility: {loading ? 'hidden' : 'visible'}; max-width: 1436px; margin: auto;">
@@ -342,18 +270,22 @@
 	border-left-style: hidden
 	
 :global(.fc .fc-daygrid-day-top)
+	padding: 0 9px
 	flex-direction: row
 	font-size: 24px
 
 :global(.fc .fc-daygrid-body-natural .fc-daygrid-day-events)
+	height: 100%
 	margin: 0
-	min-height: 100%
 
 :global(.fc .fc-daygrid-day-number)
 	padding: 0
 
 :global(.fc .fc-daygrid-day-frame)
-	padding: 12px 15px 8px 15px
+	display: flex
+	flex-direction: column
+	height: 100%
+	padding: 12px 6px 6px 6px
 
 :global(.fc .fc-daygrid-event-dot)
 	display: none
@@ -363,33 +295,61 @@
 	pointer-events: none	
 	font-size: 14px
 
+:global(.fc .fc-daygrid-event-harness)
+	height: 100%
+
+:global(.fc .fc-daygrid-event-harness-abs)
+	top: 0 !important
+	right: 0 !important
+	left: 0 !important
+
 :global(.event-time)
+	padding: 0 9px
 	color: rgb(80, 79, 77)
 
 :global(.fc .fc-event)
-	display: block
-	
-:global(.fc .fc-event .event-wrapper)
-	position: relative
 	height: 100%
-	width: 100%
-	background-image: var(--thumbnail)
-	background-size: cover
-	background-position: center top
-	display: flex
-	flex-direction: column
-	justify-content: flex-end
+
+:global(.fc .fc-event-main)
+	height: 100%
 
 :global(.fc .fc-h-event)
 	background-color: inherit
 	border: none
 
 :global(.fc .fc-event .event-title)
+	padding: 0 9px
 	display: block
 	overflow: hidden
 	text-overflow: ellipsis
 	color: $black
+	
+:global(.fc .fc-event .event-wrapper)
+	height: 100%
+	width: 100%
+	display: flex
+	flex-direction: column
+	justify-content: space-between
 
+:global(.thumbnail-wrapper)
+	position: relative
+	min-height: 110px
+	width: auto
+	overflow: hidden
+	object-fit: cover
+
+:global(.thumbnail-wrapper img)
+	height: 100%
+	width: 100%
+	object-fit: cover
+
+:global(.fc .fc-daygrid-day-bottom)
+	padding: 0 9px
+	pointer-events: none
+	margin: 0
+	position: absolute
+	top: 42px
+	
 :global(.fc .fc-daygrid-day)
 	height: 224px
 	position: relative
@@ -398,7 +358,6 @@
 	background-repeat: no-repeat
 	background-clip: padding-box
 	
-
 :global(.fc .fc-daygrid-dot-event)
 	padding: 0
 	background: inherit
@@ -407,33 +366,19 @@
 	margin: 0
 
 :global(.fc .fc-daygrid-day.has-event-thumbnail)
+	position: relative
 	cursor: pointer
 	transition: background-color 0.28s linear
-	// &::after
-	// 	content: ''
-	// 	position: absolute
-	// 	bottom: 4px
-	// 	left: 4px
-	// 	right: 4px
-	// 	height: 50%
-	// 	background-image: var(--day-bg)
-	// 	background-size: cover
-	// 	background-position: top
-	// 	pointer-events: none
-	&::before
+	&::after
 		content: ''
 		position: absolute
-		left: 4px
-		right: 4px
-		bottom: 4px
-		height: 50%
+		bottom: 6px
+		right: 6px
+		left: 6px
+		min-height: 110px
 		background: rgba(0,0,0,0.2)
-		pointer-events: none
-		z-index: 1
+		z-index: 10
 	&:hover
-		background-color: rgba(24, 24, 24, 0.2)
-		
-:global(.fc .selected)
 		background-color: rgba(24, 24, 24, 0.2)
 
 :global(.fc .fc-daygrid-day.has-event)
@@ -441,8 +386,8 @@
 	transition: background-color 0.28s linear
 	&:hover
 		background-color: rgba(24, 24, 24, 0.2)
-
-:global(.fc .fc-daygrid-more-link)
-	pointer-events: none
+		
+:global(.fc .selected)
+		background-color: rgba(24, 24, 24, 0.2)
 
 </style>
