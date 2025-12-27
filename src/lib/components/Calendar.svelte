@@ -1,13 +1,25 @@
+<!-- Calendar.svelte: -->
 <script>
-	import { onMount, onDestroy } from 'svelte';
-	import { loadCalendarGrids, useEvents } from '$lib/services/events.service.svelte.js';
+	import { onMount } from 'svelte';
+	import {
+		loadCalendarGrids,
+		useEvents,
+		hydrateEvents
+	} from '$lib/services/events.service.svelte.js';
 	import Modal from './Modal.svelte';
 
-	let { upcomingEvents, initialView } = $props();
+	let { initialEvents, upcomingEvents, initialView } = $props();
 
-	const eventsState = useEvents();
+	const eventsState = $derived(initialView === 'listMonth' ? null : useEvents());
+
+	$effect(() => {
+		if (initialView !== 'listMonth') {
+			hydrateEvents(initialEvents);
+		}
+	});
+
 	let events = $derived(initialView === 'listMonth' ? upcomingEvents : eventsState.events);
-	let loading = $derived(eventsState.loading);
+	let loading = $derived(initialView === 'listMonth' ? false : eventsState.loading);
 
 	let calendar;
 	let calendarEl;
@@ -42,12 +54,9 @@
 		const listPlugin = (await import('@fullcalendar/list')).default;
 		const interactionPlugin = (await import('@fullcalendar/interaction')).default;
 
-		await waitForHydration();
-
 		calendar = new Calendar(calendarEl, {
 			plugins: [dayGridPlugin, interactionPlugin, listPlugin],
 			initialView,
-			events,
 			height: 'auto',
 			locale: 'de',
 			firstDay: 1,
@@ -64,18 +73,22 @@
 			buttonText: {
 				today: 'Heute'
 			},
-			eventSources: [
-				{
-					id: 'events',
-					events: (info, success) => {
-						success(eventsState.events);
-					}
-				}
-			],
+			eventSources:
+				initialView === 'listMonth'
+					? []
+					: [
+							{
+								id: 'events',
+								events: (info, success) => {
+									success(eventsState.events);
+								}
+							}
+						],
 			datesSet: async (info) => {
+				if (initialView === 'listMonth') return;
 				const months = [
-					info.view.currentStart,
 					new Date(info.view.currentStart.getFullYear(), info.view.currentStart.getMonth() - 1, 1),
+					info.view.currentStart,
 					new Date(info.view.currentStart.getFullYear(), info.view.currentStart.getMonth() + 1, 1)
 				];
 
@@ -149,21 +162,18 @@
 
 		document.addEventListener('mousedown', handleClick);
 		window.addEventListener('keydown', handleKey);
-	});
-	onDestroy(() => {
-		document.removeEventListener('mousedown', handleClick);
-		window.removeEventListener('keydown', handleKey);
+		return () => {
+			document.removeEventListener('mousedown', handleClick);
+			window.removeEventListener('keydown', handleKey);
+		};
 	});
 </script>
 
-{#if loading}
+{#if initialView !== 'listMonth' && loading}
 	<div class="spinner"></div>
 {/if}
 
-<div
-	bind:this={calendarEl}
-	style="visibility: {loading ? 'hidden' : 'visible'}; max-width: 1436px; margin: auto;">
-</div>
+<div bind:this={calendarEl} style="max-width: 1436px; margin: auto;"></div>
 
 {#if modal.open}
 	<Modal bind:modalEl events={modal.events} position={modal.position} {closeModal} />

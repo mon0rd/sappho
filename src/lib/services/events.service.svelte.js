@@ -1,3 +1,4 @@
+// events.service.svelte.js:
 import { SvelteSet, SvelteMap, SvelteDate } from 'svelte/reactivity';
 
 const API_URL = 'https://sapphostudio.shop/_functions/events';
@@ -40,7 +41,7 @@ export function getMonthGridRange(date) {
 
 	const lastOfMonth = new SvelteDate(date.getFullYear(), date.getMonth() + 1, 0);
 	const end = new SvelteDate(lastOfMonth);
-	end.setDate(lastOfMonth.getDate() + ((8 - lastOfMonth.getDay()) % 7) + 1); // exclusive
+	end.setDate(lastOfMonth.getDate() + ((8 - lastOfMonth.getDay()) % 7) + 1);
 
 	return { start, end };
 }
@@ -57,7 +58,22 @@ export async function loadCalendarGrids(dates) {
 
 	return gridsToFetch.length > 0;
 }
+export function hydrateEvents(initialEvents) {
+	if (!initialEvents?.length) return;
+	if (state.events.length > 0) return;
 
+	state.events = initialEvents;
+	state.loading = false;
+
+	const dates = initialEvents.map((e) => new SvelteDate(e.start));
+	const months = new SvelteSet(dates.map((d) => `${d.getFullYear()}-${d.getMonth()}`));
+
+	for (const m of months) {
+		const [year, month] = m.split('-').map(Number);
+		const { start, end } = getMonthGridRange(new SvelteDate(year, month, 1));
+		cache.add(`${formatDate(start)}_${formatDate(end)}`);
+	}
+}
 export function useEvents() {
 	return state;
 }
